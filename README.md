@@ -1,3 +1,8 @@
+**AIM test builds:** use this repository's [Android debug APK workflow](https://github.com/theabhishekarmagi/AIM/actions/workflows/android-debug.yml).
+Download the `AIM-debug` artifact from a successful run while signed into GitHub, extract it,
+and follow [Phone testing](docs/PHONE_TESTING.md). These builds use OpenAI/GPT onboarding.
+The imported AURA project and its attribution are described in [Source provenance](SOURCE_PROVENANCE.md).
+
 <p align="center">
   <a href="https://aura-android-use.vercel.app">
     <img src="aura-android-use-website/og.png" alt="AURA: open-source hands for AI agents to control your Android" width="100%"/>
@@ -141,7 +146,11 @@ OpenAI-compatible endpoint, with your own API key. Switch whenever you like.
 it, or [build it from source](#build-from-source). You need Android 8.0 or newer.
 
 The first-run setup walks you through signing in, the permissions AURA needs (accessibility,
-display over other apps, microphone, notifications, keyboard) and choosing an AI provider and key.
+display over other apps, microphone, notifications, keyboard), then entering an **OpenAI API key**
+and choosing a GPT model returned for that key. OpenAI API billing is separate from a ChatGPT
+subscription. This checkout does not require a Gemini key or enable Gemini Live during setup.
+Use typed commands for the first test; voice input has separate provider requirements. Other
+reasoning providers remain available later under **Agent → Brain**.
 
 ### 2. Use it on the phone
 

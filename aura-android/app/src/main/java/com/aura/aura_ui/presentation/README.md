@@ -3,7 +3,7 @@
 > **Keep this file current.** If you add, remove, rename or repurpose anything in this folder,
 > update this README in the same commit. A stale map is worse than no map.
 >
-> **Last reviewed:** 2026-09-26, against the `prod` branch.
+> **Last reviewed:** 2026-10-28.
 
 Everything the user sees in the AURA **app** (Settings, onboarding, the MCP centre, traces, eval),
 plus the **overlay UI** the assistant draws on top of other apps. All of it is Jetpack Compose.
@@ -39,6 +39,13 @@ presentation/
 ├── permissions/  the permission catalogue and its toggle rows
 └── utils/        HapticUtils (vibration profiles)
 ```
+
+`screens/onboarding/OnboardingScreen.kt` requires an OpenAI key, fetches the account's model
+list, and saves the chosen GPT model to `ProviderKeyStore`. `OpenAiOnboardingModels.kt`
+filters specialized models out of that picker; listing a model does not establish inference
+or tool-call access. Saving this setup disables Gemini Live. Other providers remain selectable
+in **Agent → Brain**. Initial phone verification uses typed commands; this setup does not add
+OpenAI speech recognition or realtime voice support.
 
 ### `navigation/`
 | File | What it does |

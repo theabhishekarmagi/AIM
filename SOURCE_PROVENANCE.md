@@ -13,8 +13,8 @@ See `LICENSE`, `LICENSE-EXCEPTION.md`, and `THIRD_PARTY_NOTICES.md`. The desktop
 in `aura-mcp-connect/` has its own MIT license. A fresh repository does not remove these
 obligations or grant proprietary distribution rights.
 
-The imported Android, desktop bridge, and website implementation files are unchanged.
-Repository metadata adjustments are limited to:
+The initial import preserved the Android, desktop bridge, and website implementation files.
+Initial repository metadata adjustments were:
 
 - Excluding `local.properties` and `.gradle/` from version control.
 - Moving the original CLA workflow to `.github/upstream-cla.yml.disabled`, where GitHub
@@ -22,7 +22,13 @@ Repository metadata adjustments are limited to:
   for contributions to this checkout; the contribution instructions say so explicitly.
 - Adding this provenance record.
 
+This checkout changes Android onboarding to accept an OpenAI API key and a fetched GPT model
+without requiring Gemini or enabling Gemini Live. Other reasoning providers remain available
+in settings. The model picker excludes specialized variants unsuitable for the initial agent
+test; compatibility still requires a real device and API inference test.
+
 This source import does not include a working Firebase project, model-provider credentials,
 or release-signing credentials. Configure independently controlled services before building
 or operating a customized distribution; see the upstream build and `remote/README.md`
-instructions. No Android build or device compatibility test is established by this import.
+instructions. The initial import alone establishes neither an Android build nor device
+compatibility; subsequent build and test results must be recorded separately.

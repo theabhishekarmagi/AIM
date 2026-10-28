@@ -56,6 +56,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -115,6 +116,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -130,9 +132,9 @@ import com.aura.aura_ui.remote.AuraSignIn
 import com.aura.aura_ui.remote.AuthState
 import com.aura.aura_ui.remote.SignInOutcome
 import com.aura.aura_ui.agent.conversation.CompanionConfig
-import com.aura.aura_ui.agent.conversation.LiveModelResolver
 import com.aura.aura_ui.agent.llm.LlmEndpointCatalog
 import com.aura.aura_ui.agent.llm.ModelCatalog
+import com.aura.aura_ui.agent.llm.ModelInfo
 import com.aura.aura_ui.agent.llm.RestrictedAppClassifier
 import com.aura.aura_ui.mcp.AppRestrictedApps
 import com.aura.aura_ui.mcp.bridge.ProviderKeyStore
@@ -167,7 +169,7 @@ import kotlinx.coroutines.launch
 // 5: Voice & Assistant Overlay (anim_microphone.html)
 // 6: AURA Virtual Keyboard (anim_keyboard.html)
 // 7: Notifications & Live Alerts (anim_notifications.html)
-// 8: Gemini API Key Verification
+// 8: OpenAI API Key and GPT Model
 // 9: Restricted Apps Scanner
 // ============================================================================
 
@@ -260,7 +262,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .clickable { step-- },
+                            .clickable { keyVerified = false; step-- },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -376,9 +378,14 @@ fun OnboardingScreen(
                     refreshTrigger = refreshPermissions,
                     onRequestRuntime = { runtimeLauncher.launch(it.toTypedArray()) },
                     onOpenSystem = { openPermissionSystemPage(context, it, onScreenCapture = {}) },
-                    onAutoAdvance = { if (step == 7) step = 8 },
+                    onAutoAdvance = {
+                        if (step == 7) {
+                            keyVerified = false
+                            step = 8
+                        }
+                    },
                 )
-                8 -> GeminiKeyStep(onVerifiedChanged = { keyVerified = it })
+                8 -> OpenAiKeyStep(onVerifiedChanged = { keyVerified = it })
                 else -> RestrictedAppsStep()
             }
         }
@@ -409,7 +416,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .clickable { step-- },
+                            .clickable { keyVerified = false; step-- },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -450,7 +457,7 @@ fun OnboardingScreen(
                                 5 -> "Next"
                                 6 -> "Next"
                                 7 -> "Next"
-                                8 -> if (keyVerified) "Next" else "Verify Key"
+                                8 -> if (keyVerified) "Next" else "Choose GPT model"
                                 else -> "Launch AURA"
                             },
                             style = MaterialTheme.typography.titleMedium.copy(
@@ -1485,25 +1492,26 @@ private fun NotificationsPermissionStep(
     }
 }
 
-// ── Step 8: Gemini Key ───────────────────────────────────────────────────────
+// ── Step 8: OpenAI Key and GPT Model ───────────────────────────────────────
 @Composable
-private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
+private fun OpenAiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
     val scheme = rememberMonoScheme()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     val keyStore = remember { ProviderKeyStore(context.applicationContext) }
-    val gemini = remember { LlmEndpointCatalog.builtinById(LlmEndpointCatalog.GEMINI_ID)!! }
+    val openAi = remember { LlmEndpointCatalog.builtinById(LlmEndpointCatalog.OPENAI_ID)!! }
 
-    var keyText by remember { mutableStateOf(keyStore.getKey(LlmEndpointCatalog.GEMINI_ID).orEmpty()) }
+    var keyText by remember { mutableStateOf(keyStore.getKey(openAi.id).orEmpty()) }
     var revealed by remember { mutableStateOf(false) }
-    var brainModel by remember { mutableStateOf(LlmEndpointCatalog.GEMINI_DEFAULT_MODEL_ID) }
-    var liveModel by remember { mutableStateOf(CompanionConfig.LIVE_MODEL) }
-    var brainModels by remember { mutableStateOf<List<String>>(listOf(LlmEndpointCatalog.GEMINI_DEFAULT_MODEL_ID)) }
-    var liveModels by remember { mutableStateOf<List<String>>(listOf(CompanionConfig.LIVE_MODEL)) }
+    var brainModel by remember { mutableStateOf(keyStore.getSelectedModel(openAi.id).orEmpty()) }
+    var brainModels by remember { mutableStateOf<List<ModelInfo>>(emptyList()) }
     var verifying by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var verified by remember { mutableStateOf(keyStore.isConfigured(LlmEndpointCatalog.GEMINI_ID)) }
+    var verified by remember { mutableStateOf(false) }
+
+    // A stored key alone does not establish that the selected model is still available.
+    LaunchedEffect(verified) { onVerifiedChanged(verified) }
 
     Column(
         modifier = Modifier
@@ -1513,7 +1521,7 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Bring your own Gemini key",
+            text = "Use GPT on your phone",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.6).sp,
@@ -1522,7 +1530,8 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Required — drives both Agent Brain reasoning and natural Gemini Live voice mode.",
+            text = "Connect OpenAI for screen observation and typed commands. No Gemini key is required. " +
+                "OpenAI API billing is separate from a ChatGPT subscription.",
             style = MaterialTheme.typography.bodySmall,
             color = scheme.textSecondary,
         )
@@ -1538,7 +1547,7 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { uriHandler.openUri(gemini.keyUrl ?: "https://aistudio.google.com/apikey") },
+                        .clickable { uriHandler.openUri(openAi.keyUrl ?: "https://platform.openai.com/api-keys") },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
@@ -1552,7 +1561,7 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = "Get a free key at aistudio.google.com/apikey",
+                        text = "Create an OpenAI API key",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         color = scheme.textPrimary,
                         modifier = Modifier.weight(1f),
@@ -1569,9 +1578,17 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
 
                 OutlinedTextField(
                     value = keyText,
-                    onValueChange = { keyText = it; verified = false; onVerifiedChanged(false) },
-                    label = { Text("Gemini API key") },
-                    placeholder = { Text(gemini.keyHint ?: "AIza...") },
+                    onValueChange = {
+                        keyText = it
+                        brainModels = emptyList()
+                        verified = false
+                        error = null
+                        onVerifiedChanged(false)
+                    },
+                    enabled = !verifying,
+                    label = { Text("OpenAI API key") },
+                    placeholder = { Text(openAi.keyHint ?: "sk-...") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     isError = error != null,
                     shape = RoundedCornerShape(12.dp),
@@ -1585,64 +1602,31 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                ModelDropdown(
-                    label = "Agent Brain Model",
-                    selected = brainModel,
-                    options = brainModels,
-                    stripPrefix = false,
-                    onSelect = { brainModel = it },
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                ModelDropdown(
-                    label = "Gemini Live Voice Model",
-                    selected = liveModel,
-                    options = liveModels,
-                    stripPrefix = true,
-                    onSelect = { liveModel = it },
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
                 OutlinedButton(
                     enabled = !verifying && keyText.isNotBlank(),
                     onClick = {
                         scope.launch {
                             verifying = true
+                            verified = false
+                            onVerifiedChanged(false)
                             error = null
-                            val trimmed = keyText.trim()
-                            val brainResult = ModelCatalog.fetch(gemini, trimmed)
-                            val liveResult = LiveModelResolver.listLiveModels(trimmed)
-                            val brainOk = brainResult.isSuccess && brainResult.getOrNull()?.isNotEmpty() == true
-                            if (!brainOk) {
-                                error = brainResult.exceptionOrNull()?.message ?: "Key rejected — check it and try again."
-                                verified = false
-                                onVerifiedChanged(false)
-                            } else {
-                                brainModels = brainResult.getOrNull().orEmpty().map { it.id }
-                                    .let { if (it.contains(brainModel)) it else listOf(brainModel) + it }
-                                liveModels = liveResult.ifEmpty { listOf(liveModel) }
-                                    .let { if (it.contains(liveModel)) it else listOf(liveModel) + it }
-
-                                keyStore.setKey(LlmEndpointCatalog.GEMINI_ID, trimmed)
-                                keyStore.setSelectedEndpointId(LlmEndpointCatalog.GEMINI_ID)
-                                keyStore.setSelectedModel(LlmEndpointCatalog.GEMINI_ID, brainModel)
-                                val brainInfo = brainResult.getOrNull()?.firstOrNull { it.id == brainModel }
-                                keyStore.setSelectedModelContextWindow(
-                                    LlmEndpointCatalog.GEMINI_ID,
-                                    brainInfo?.contextWindow,
-                                )
-                                keyStore.setSelectedModelVisionCapable(
-                                    LlmEndpointCatalog.GEMINI_ID,
-                                    brainInfo?.visionCapable,
-                                )
-                                val companion = CompanionConfig(context)
-                                companion.liveModel = liveModel
-                                companion.enabled = true
-                                companion.useGeminiLive = true
-
-                                verified = true
-                                onVerifiedChanged(true)
+                            brainModels = emptyList()
+                            try {
+                                val result = ModelCatalog.fetch(openAi, keyText.trim())
+                                if (result.isFailure) {
+                                    error = (result.exceptionOrNull() as? ModelCatalog.ModelFetchError)?.userMessage
+                                        ?: "Couldn't fetch GPT models. Try again."
+                                } else {
+                                    brainModels = OpenAiOnboardingModels.eligible(result.getOrNull().orEmpty())
+                                    brainModel = OpenAiOnboardingModels.preferred(brainModels, brainModel).orEmpty()
+                                    if (brainModels.isEmpty()) {
+                                        error = "No supported GPT models were returned for this key. " +
+                                            "Check your OpenAI project permissions and model access."
+                                    }
+                                }
+                            } finally {
+                                verifying = false
                             }
-                            verifying = false
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
@@ -1651,14 +1635,57 @@ private fun GeminiKeyStep(onVerifiedChanged: (Boolean) -> Unit) {
                     if (verifying) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Mono.Ink)
                         Spacer(Modifier.width(8.dp))
-                        Text("Verifying Key...")
-                    } else if (verified) {
-                        Icon(Icons.Filled.CheckCircle, null, tint = scheme.textPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Key Verified")
+                        Text("Fetching GPT models...")
                     } else {
-                        Text("Verify API Key")
+                        Text("Fetch GPT models")
                     }
+                }
+
+                if (brainModels.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ModelDropdown(
+                        label = "GPT model",
+                        selected = brainModel,
+                        options = brainModels.map { it.id },
+                        stripPrefix = false,
+                        onSelect = {
+                            brainModel = it
+                            verified = false
+                            onVerifiedChanged(false)
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        enabled = !verifying && brainModels.any { it.id == brainModel },
+                        onClick = {
+                            val model = brainModels.firstOrNull { it.id == brainModel } ?: return@OutlinedButton
+                            keyStore.setKey(openAi.id, keyText.trim())
+                            keyStore.setSelectedEndpointId(openAi.id)
+                            keyStore.setSelectedModel(openAi.id, model.id)
+                            keyStore.setSelectedModelContextWindow(openAi.id, model.contextWindow)
+                            keyStore.setSelectedModelVisionCapable(openAi.id, model.visionCapable)
+                            // GPT setup must not turn on a separate Gemini voice session.
+                            CompanionConfig(context).apply {
+                                enabled = false
+                                useGeminiLive = false
+                            }
+                            verified = true
+                            onVerifiedChanged(true)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (verified) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = scheme.textPrimary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(if (verified) "GPT configuration saved" else "Use this GPT model")
+                    }
+                    Text(
+                        text = "Model listing checks key access. The first task will also check inference and API billing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.textSecondary,
+                    )
                 }
                 error?.let {
                     Spacer(Modifier.height(8.dp))

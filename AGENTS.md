@@ -2,7 +2,7 @@
 
 > **Keep this file current.** Update it in the same commit as any change it describes.
 >
-> **Last reviewed:** 2026-09-30.
+> **Last reviewed:** 2026-10-28.
 
 Instructions for AI coding agents (and humans) working in this repo.
 
@@ -11,6 +11,9 @@ AURA is an Android app that automates the phone by voice or text. Everything run
 The code is in `aura-android/`:
 - `:app`: the app (UI, the on-device agent, accessibility and gesture execution)
 - `:mcp-server`: the tool server the app hosts in-process, i.e. the agent's action space
+
+This checkout starts with an OpenAI API key and a fetched GPT model during onboarding.
+Gemini Live stays disabled by that setup; other providers remain available under Agent → Brain.
 
 `aura-mcp-connect/` is the desktop bridge (Node, MIT-licensed) that lets MCP clients on a
 computer reach the phone.
