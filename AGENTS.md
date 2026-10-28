@@ -14,6 +14,8 @@ The code is in `aura-android/`:
 
 This checkout starts with an OpenAI API key and a fetched GPT model during onboarding.
 Gemini Live stays disabled by that setup; other providers remain available under Agent → Brain.
+For local Android Studio setup, verified test evidence, and the next UI work, read
+`docs/LOCAL_DEVELOPMENT_HANDOFF.md`.
 
 `aura-mcp-connect/` is the desktop bridge (Node, MIT-licensed) that lets MCP clients on a
 computer reach the phone.

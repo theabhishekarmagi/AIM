@@ -3,6 +3,8 @@ Download the `AIM-debug` artifact from a successful run while signed into GitHub
 and follow [Phone testing](docs/PHONE_TESTING.md). These builds use OpenAI/GPT onboarding.
 The imported AURA project and its attribution are described in [Source provenance](SOURCE_PROVENANCE.md).
 
+For local Codex and Android Studio setup, read [Local development handoff](docs/LOCAL_DEVELOPMENT_HANDOFF.md).
+
 <p align="center">
   <a href="https://aura-android-use.vercel.app">
     <img src="aura-android-use-website/og.png" alt="AURA: open-source hands for AI agents to control your Android" width="100%"/>
