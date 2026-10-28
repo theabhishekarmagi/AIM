@@ -23,11 +23,18 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Prepare Android SDK and local configuration
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          cmdline-tools-version: '12266719'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+
+      - name: Prepare local configuration
         shell: bash
         run: |
-          sdkmanager --licenses < <(yes) > /dev/null
-          sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+          sdkmanager --version
           cp aura-android/app/google-services.example.json aura-android/app/google-services.json
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > aura-android/local.properties
 
